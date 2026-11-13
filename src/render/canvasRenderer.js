@@ -27,8 +27,8 @@ export class CanvasRenderer {
     const fovScale = this.height * 0.62;
     const horizonY = this.height * 0.42;
 
-    // Camera follows behind and slightly above the truck
-    const camX = runState.truckX * 0.88;
+    // Subtle camera follow keeps truck motion nearly 1:1 with pointer X on screen
+    const camX = runState.truckX * 0.12;
     const camY = 2.25;
     const relX = worldX - camX;
     const screenX = this.width * 0.5 + (relX * fovScale) / z;
@@ -98,15 +98,8 @@ export class CanvasRenderer {
     const scaleZ = ent.category === 'gate' ? 0.4 : ent.width * 0.9;
 
     const timeSec = performance.now() * 0.008;
-    const radarOffsetX =
-      Math.sin(timeSec * 2.3 + ent.id * 4.1) * radarJitter * 0.75 +
-      Math.cos(timeSec * 5.7 + ent.id * 1.9) * radarJitter * 0.35;
-    const radarOffsetZ = Math.cos(timeSec * 1.9 + ent.id * 2.7) * radarJitter * 3.2;
-
-    // If ONLY 4D Radar detects this object (outside LiDAR/Camera), shift its rendered position by radar jitter
-    const hasExactLock = inShortLidar || inLongLidar || inCamera;
-    const renderX = hasExactLock ? ent.x : ent.x + radarOffsetX;
-    const renderZ = hasExactLock ? ent.z : Math.max(1.6, ent.z + radarOffsetZ);
+    const renderX = ent.x;
+    const renderZ = ent.z;
 
     const baseProj = this.project3D(renderX, 0, renderZ, runState);
     const topProj = this.project3D(renderX, ent.height, renderZ, runState);
@@ -232,32 +225,23 @@ export class CanvasRenderer {
     }
 
     // =========================================================================
-    // E. 4D IMAGING RADAR PASS (Coarse Location Jitter + Doppler Velocity Vector)
+    // E. 4D IMAGING RADAR PASS (Steady Bounding Box + Doppler Velocity Vector)
     // =========================================================================
     if (inRadar) {
-      const rX = ent.x + radarOffsetX;
-      const rZ = Math.max(1.6, ent.z + radarOffsetZ);
-      const radarBaseProj = this.project3D(rX, 0, rZ, runState);
-      const radarTopProj = this.project3D(rX, ent.height, rZ, runState);
-      const rBoxW = Math.max(16, ent.width * radarBaseProj.scale);
-      const rBoxH = Math.max(16, Math.abs(radarBaseProj.y - radarTopProj.y));
-      const rBoxX = radarBaseProj.x - rBoxW * 0.5;
-      const rBoxY = radarTopProj.y;
-
       ctx.globalAlpha = Math.max(0.5, visibility);
       ctx.strokeStyle = '#ffaa00';
       ctx.lineWidth = 1.4;
 
       ctx.setLineDash([5, 4]);
-      ctx.strokeRect(rBoxX - 4, rBoxY - 4, rBoxW + 8, rBoxH + 8);
+      ctx.strokeRect(boxX - 4, boxY - 4, boxW + 8, boxH + 8);
       ctx.setLineDash([]);
 
       // Draw Doppler Velocity Vector Arrow for moving pickups
       if (Math.abs(ent.vx) > 0.01 || Math.abs(ent.vz) > 0.01) {
         ctx.beginPath();
-        ctx.moveTo(radarBaseProj.x, rBoxY + rBoxH * 0.5);
-        const arrowEndX = radarBaseProj.x + ent.vx * 44;
-        const arrowEndY = rBoxY + rBoxH * 0.5 + (ent.vz > 0 ? 18 : 0);
+        ctx.moveTo(baseProj.x, boxY + boxH * 0.5);
+        const arrowEndX = baseProj.x + ent.vx * 44;
+        const arrowEndY = boxY + boxH * 0.5 + (ent.vz > 0 ? 18 : 0);
         ctx.lineTo(arrowEndX, arrowEndY);
         ctx.stroke();
 
@@ -265,8 +249,8 @@ export class CanvasRenderer {
         ctx.font = 'bold 9px monospace';
         ctx.fillText(
           `DOPPLER v=${Math.hypot(ent.vx, ent.vz).toFixed(1)}m/s`,
-          rBoxX,
-          rBoxY - 12
+          boxX,
+          boxY - 12
         );
       }
     }
@@ -429,6 +413,9 @@ export class CanvasRenderer {
       ctx.ellipse(0, -spriteHeight * 0.06, spriteWidth * 0.34, spriteHeight * 0.12, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Tire spray / kick-up matched to driving condition
+      this.drawTireConditionSpray(ctx, spriteWidth, spriteHeight, runState);
+
       // Draw `Truck_Model.png`
       ctx.drawImage(
         truckSprite.image,
@@ -503,10 +490,80 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
+  drawTireConditionSpray(ctx, spriteWidth, spriteHeight, runState) {
+    const condition = runState?.level?.condition || 'dusty';
+    const speedFactor = Math.min(1.4, (runState.speed || 15) / 22);
+    const phase = performance.now() * 0.012;
+    const kickOffsets = [-spriteWidth * 0.34, spriteWidth * 0.34];
+
+    const colors = {
+      dusty: 'rgba(224, 158, 86, 0.45)',
+      muddy: 'rgba(92, 62, 34, 0.72)',
+      rainy: 'rgba(175, 226, 255, 0.55)',
+      snowy: 'rgba(236, 249, 255, 0.72)'
+    };
+
+    ctx.save();
+    ctx.fillStyle = colors[condition] || colors.dusty;
+    for (const kx of kickOffsets) {
+      for (let i = 0; i < 4; i++) {
+        const wave = Math.sin(phase + i * 1.7 + kx);
+        const px = kx + (kx < 0 ? -1 : 1) * (5 + i * 5) + wave * 3;
+        const py = -spriteHeight * 0.08 - (i * 5.5 + Math.abs(wave) * 4) * speedFactor;
+        const rad = (condition === 'muddy' ? 3.5 : 5.2) + (i % 2) * 2.2;
+        ctx.beginPath();
+        ctx.arc(px, py, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   drawMudOcclusionOverlay(ctx, width, height, runState) {
     const mudAmount = 1 - runState.opticClarity;
-    if (mudAmount > 0.15) {
-      ctx.fillStyle = `rgba(58, 44, 28, ${mudAmount * 0.42})`;
+    if (mudAmount <= 0.15) return;
+
+    const condition = runState?.level?.condition || 'muddy';
+    ctx.save();
+
+    if (condition === 'rainy') {
+      ctx.fillStyle = `rgba(145, 208, 255, ${mudAmount * 0.32})`;
+      ctx.strokeStyle = `rgba(220, 245, 255, ${mudAmount * 0.48})`;
+      ctx.lineWidth = 1.5;
+      for (let i = 0; i < 20; i++) {
+        const rx = ((i * 89) % 100) * 0.01 * width;
+        const ry = ((i * 61) % 100) * 0.01 * height;
+        const r = (9 + (i % 4) * 7) * mudAmount;
+        ctx.beginPath();
+        ctx.arc(rx, ry, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    } else if (condition === 'snowy') {
+      const frost = ctx.createRadialGradient(
+        width * 0.5,
+        height * 0.5,
+        Math.min(width, height) * 0.24,
+        width * 0.5,
+        height * 0.5,
+        Math.max(width, height) * 0.62
+      );
+      frost.addColorStop(0, 'rgba(225, 245, 255, 0)');
+      frost.addColorStop(1, `rgba(218, 242, 255, ${mudAmount * 0.56})`);
+      ctx.fillStyle = frost;
+      ctx.fillRect(0, 0, width, height);
+    } else if (condition === 'dusty') {
+      ctx.fillStyle = `rgba(176, 114, 52, ${mudAmount * 0.35})`;
+      for (let i = 0; i < 22; i++) {
+        const rx = ((i * 97) % 100) * 0.01 * width;
+        const ry = ((i * 53) % 100) * 0.01 * height;
+        const rRadius = (14 + (i % 5) * 12) * mudAmount;
+        ctx.beginPath();
+        ctx.arc(rx, ry, rRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = `rgba(58, 44, 28, ${mudAmount * 0.45})`;
       for (let i = 0; i < 18; i++) {
         const rx = ((i * 97) % 100) * 0.01 * width;
         const ry = ((i * 53) % 100) * 0.01 * height;
@@ -516,5 +573,7 @@ export class CanvasRenderer {
         ctx.fill();
       }
     }
+
+    ctx.restore();
   }
 }

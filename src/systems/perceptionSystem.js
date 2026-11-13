@@ -38,7 +38,7 @@ export class PerceptionSystem {
       radarRange: 0,
       radarActive: false,
       radarBiasX: 0,
-      radarJitter: 0.45,
+      radarJitter: 0,
 
       cameraMinZ: 999,
       cameraRange: 0,
@@ -83,10 +83,7 @@ export class PerceptionSystem {
         envelope.radarRange = Math.max(envelope.radarRange, rawRange);
         envelope.radarActive = true;
         envelope.radarBiasX += netBiasX;
-        envelope.radarJitter = Math.min(
-          envelope.radarJitter,
-          (sensor.positionJitter || 0.45) / Math.max(0.7, hardpoint.detailMultiplier)
-        );
+        envelope.radarJitter = 0;
       } else if (sensor.type === 'camera') {
         // Camera blinds out for 0.35s while the high-pressure wiper purge runs
         const wiperOpen = runState.purgingTimer <= 0.05;

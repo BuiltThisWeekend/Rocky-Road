@@ -1,10 +1,13 @@
 export class CollisionSystem {
   update(dt, runState, input, audioSystem) {
-    // Agile, high-response steering toward thumb / keyboard input
-    const desiredX = input.targetSteer;
-    const steerDelta = desiredX - runState.truckX;
-    runState.lateralVelocity = steerDelta * 10.5;
-    runState.truckX = Math.max(-1.48, Math.min(1.48, runState.truckX + runState.lateralVelocity * dt));
+    // Direct 1:1 lateral tracking toward cursor / finger input
+    const desiredX = Math.max(-1.48, Math.min(1.48, input.targetSteer));
+    const prevX = runState.truckX;
+    const followFactor = Math.min(1.0, dt * 28);
+    runState.truckX = Math.max(-1.48, Math.min(1.48, prevX + (desiredX - prevX) * followFactor));
+    runState.lateralVelocity = dt > 0
+      ? Math.max(-12, Math.min(12, (runState.truckX - prevX) / dt))
+      : 0;
 
     if (runState.alertTimer > 0) {
       runState.alertTimer = Math.max(0, runState.alertTimer - dt);
@@ -44,10 +47,10 @@ export class CollisionSystem {
 
       if (ent.isPositive) {
         audioSystem?.playGateChime(true);
-        runState.triggerAlert(`GATE ENGAGED: ${ent.label}`, 1.5);
+        runState.triggerAlert(`GATE ENGAGED: ${ent.label}`, 1.5, 'good');
       } else {
         audioSystem?.playGateChime(false);
-        runState.triggerAlert(`SENSOR DEGRADATION: ${ent.label}`, 1.8);
+        runState.triggerAlert(`SENSOR DEGRADATION: ${ent.label}`, 1.8, 'danger');
       }
       return;
     }
@@ -55,10 +58,11 @@ export class CollisionSystem {
     if (ent.category === 'ore') {
       const spaceLeft = Math.max(0, runState.maxPayloadTons - runState.payloadTons);
       const addedTons = Math.min(spaceLeft, ent.tonnage);
+      const earned = Math.round(addedTons * ent.creditValuePerTon);
       runState.payloadTons += addedTons;
-      runState.earnedCredits += Math.round(addedTons * ent.creditValuePerTon);
+      runState.earnedCredits += earned;
       audioSystem?.playOrePickup(ent.isHighGrade);
-      runState.triggerAlert(`EXTRACTED: ${ent.label}`, 1.4);
+      runState.triggerAlert(`+$${earned} EXTRACTED: ${ent.label} (+${addedTons}t)`, 1.4, 'good');
       return;
     }
 

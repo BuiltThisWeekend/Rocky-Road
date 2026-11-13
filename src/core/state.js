@@ -42,6 +42,7 @@ export class RunState {
     this.earnedCredits = 0;
     this.alertBannerText = '';
     this.alertTimer = 0;
+    this.alertTone = 'danger';
 
     // Build mounted sensor instances with hardpoint modifiers
     this.mountedSensors = {};
@@ -65,8 +66,9 @@ export class RunState {
     this.worldEntities = [];
   }
 
-  triggerAlert(message, duration = 2.2) {
+  triggerAlert(message, duration = 2.2, tone = 'danger') {
     this.alertBannerText = message;
     this.alertTimer = duration;
+    this.alertTone = tone;
   }
 }

@@ -14,6 +14,18 @@ export class InputController {
     this.bindEvents();
   }
 
+  clientXToSteer(clientX) {
+    const rect = this.canvas.getBoundingClientRect();
+    const width = rect.width || window.innerWidth || 375;
+    const height = rect.height || window.innerHeight || 667;
+    const localX = clientX - rect.left;
+    // Exact inverse of project3D screenX at z = 3.1 with camX = truckX * 0.12:
+    // screenX = width * 0.5 + truckX * (0.176 * height)
+    const pxPerMeter = Math.max(40, height * 0.176);
+    const steer = (localX - width * 0.5) / pxPerMeter;
+    return Math.max(-1.48, Math.min(1.48, steer));
+  }
+
   bindEvents() {
     this.canvas.addEventListener('pointerdown', (e) => {
       this.pointerActive = true;
@@ -21,17 +33,14 @@ export class InputController {
       this.startY = e.clientY;
       this.lastX = e.clientX;
       this.touchStartTime = performance.now();
+      this.targetSteer = this.clientXToSteer(e.clientX);
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (!this.pointerActive) return;
-      const dx = e.clientX - this.lastX;
+      const isHoverMouse = e.pointerType === 'mouse' && e.target === this.canvas;
+      if (!this.pointerActive && !isHoverMouse) return;
       this.lastX = e.clientX;
-
-      const width = window.innerWidth || 375;
-
-      // Agile horizontal drag controls lateral pit position
-      this.targetSteer = Math.max(-1.45, Math.min(1.45, this.targetSteer + (dx / width) * 3.6));
+      this.targetSteer = this.clientXToSteer(e.clientX);
     });
 
     window.addEventListener('pointerup', (e) => {

@@ -194,7 +194,6 @@ export class RigPreviewRenderer {
       ctx.globalAlpha = isHighlighted ? 0.9 : 0.5;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(tx - 10, ty - 8, 20, 16);
-      ctx.strokeRect(tx - 6, ty - 12, 20, 16);
       ctx.setLineDash([]);
     } else if (sensor.type === 'camera') {
       const targetDist = (minRangePx + effRangePx) * 0.6;

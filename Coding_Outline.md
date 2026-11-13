@@ -6,22 +6,22 @@
   - `src/config/*.config.js`: Pure data definitions:
     - `sensors.config.js`: Sensor stats, min/max range windows, FOV angles, dust penetration, radar jitter, power/weight costs, and upgrade scaling.
     - `equipment.config.js`: Truck chassis tiers (`Mk.I Hauler`, `Mk.II Titan`, `Mk.III Ultra`), structural hardpoints (`front_bumper`, `roof_mast`, `fender_left`, `fender_right`), and power/mass validation.
-    - `levels.config.js`: Excavation sectors (`bench_upper`, `decline_portal`, `abyssal_stope`), depths, ambient dust density, and allowed static/moving hazard pools.
+    - `levels.config.js`: Four themed driving sectors (`bench_upper` = `DUSTY`, `decline_portal` = `MUDDY`, `abyssal_stope` = `RAINY`, `arctic_glacier` = `SNOWY`), depths, ambient hazard density, and active spawn pools.
     - `rewards.config.js`: Multiplier gate definitions (`GATE_POOLS`) and ore vein payload types (`ORE_TYPES`).
   - `src/core/`:
     - `loop.js`: Fixed 60fps timestep game loop (`GameLoop`).
-    - `input.js`: Responsive one-handed horizontal thumb-drag / keyboard steering (`targetSteer`) and tap-to-purge (`onPurgeCallback`) (`InputController`).
+    - `input.js`: Direct 1:1 cursor/touch-tracking steering (`clientXToSteer` calibrated to `project3D` at `z = 3.1`), keyboard fallback, and tap-to-purge (`onPurgeCallback`) (`InputController`).
     - `state.js`: Active run telemetry, mounted sensor health/calibration, hull integrity, optic clarity, and world entities (`RunState`).
     - `saveManager.js`: `localStorage` persistence (`VANGUARD_SAVE_LEDGER_V1`) plus JSON file export/import (`SaveManager`).
   - `src/systems/`:
     - `perceptionSystem.js`: Evaluates mounted sensor frustums, min-range deadzones, max-range horizons, dust attenuation, per-point pit visibility (`getPointVisibility`), and high-pressure wiper Optic Purge (`PerceptionSystem`).
     - `spawnerSystem.js`: Spawns balanced waves of dual multiplier gates, ore veins, static hazards, and bounded-patrol moving vehicles/rockslides (`SpawnerSystem`).
-    - `collisionSystem.js`: High-response agile lateral steering (no rollover/steer-rate penalty), compact truck footprint collision checks, ore extraction, gate buffs, and mud/kinetic hazard impacts (`CollisionSystem`).
+    - `collisionSystem.js`: Direct 1:1 lateral tracking (`CollisionSystem`), compact truck footprint collision checks, ore extraction, gate buffs, and mud/kinetic hazard impacts.
     - `audioSystem.js`: Procedural Web Audio turbine rumble, LiDAR sweep pings, gate chimes, ore pickup tones, impact crunches, and pneumatic wiper hiss (`AudioSystem`).
   - `src/render/`:
-    - `modelRegistry.js`: Hybrid **2D Sprite (`.png`/`.svg`) & 3D Mesh (`.obj`/procedural)** registry (`ModelRegistry`). Preloads `./Truck_Model.png` and provides distinct 3D polyhedral meshes for `truck`, `boulder`, `rockslide`, `ore` (3-spire crystal cluster), `rogue_loader`, `service_truck`, `drill_drone`, and `gate`.
-    - `canvasRenderer.js`: 3D perspective projection (`project3D`), `Truck_Model.png` chase-cam rendering with dynamic steering lean and glowing hardpoint nodes (`draw3DTruck`), instant-read ground signatures (`◆ +ORE ◆` diamond rings vs. `▲ HAZARD` crimson `✕` pads), and multi-modal entity rendering (`CanvasRenderer`).
-    - `sensorLayers.js`: Renders the 3D excavated haul road pit (compacted roadbed, tire ruts, earthen safety berms with reflective markers, terraced rock benches) and the subterranean dark Fog-of-War shroud outside active sensor beams (`SensorLayersRenderer`).
+    - `modelRegistry.js`: Hybrid **2D Sprite (`.png`/`.svg`) & 3D Mesh (`.obj`/procedural)** registry (`ModelRegistry`). Preloads `./Truck_Model.png`, `./boulder.png`, and `./pickup.png`, alongside 3D polyhedral fallbacks.
+    - `canvasRenderer.js`: 3D perspective projection (`project3D` with `camX = truckX * 0.12` for direct pointer-to-truck alignment), `Truck_Model.png` chase-cam rendering with condition-matched tire spray (`drawTireConditionSpray`) and lens occlusion (`drawMudOcclusionOverlay`), instant-read ground signatures, and multi-modal entity rendering (`CanvasRenderer`).
+    - `sensorLayers.js`: Renders cartoony-realistic condition backdrops (`renderConditionBackground`), themed open-pit haul roads with puddles/drifts/snowbanks (`renderHaulRoadPit`), horizon-preserving dark fog shroud (`renderDarkFogOverlay`), and animated weather particles (`renderWeatherParticles`) (`SensorLayersRenderer`).
     - `rigPreviewRenderer.js`: Interactive top-down schematic canvas (`#rig-preview-canvas`) in the Rigging Bay showing `Truck_Model.png` facing upward with live sensor FOV cones, range windows, and near-field blind spots (`RigPreviewRenderer`).
     - `hudRenderer.js`: Updates diegetic cab telemetry (`DEPTH`, `VELOCITY`, `PAYLOAD`, `HORIZON`), hull/optic gauges, hardpoint health readouts, and the wiper sweep animation (`HudRenderer`).
 
@@ -38,7 +38,7 @@ Areas of the haul road pit not illuminated by an active sensor frustum are shrou
    - **Role & Trade-Off:** Projects green topographic pit scanlines and 3D wireframes deep down the haul corridor, but suffers from a **32m near-field blind spot (`BLIND <32m`)** right in front of the truck.
 3. **4D Imaging Doppler Radar (`radar_4d`):**
    - **Window:** `6m–120m` (`68°` medium cone).
-   - **Role & Trade-Off:** Pierces **100% of silica dust and dark fog** and displays Doppler velocity vectors (`v=m/s`) on moving traffic, but suffers from **positional location jitter (`±0.45m`)**—objects only seen by Radar wander/jitter until locked by LiDAR or Camera.
+   - **Role & Trade-Off:** Pierces **100% of silica dust and dark fog** and displays steady bounding boxes and Doppler velocity vectors (`v=m/s`) on moving traffic, at higher power/mass cost and `6m` minimum range.
 4. **AI Optical & Thermal Camera (`optical_cam`):**
    - **Window:** `2m–42m` (`60°` floodlight cone).
    - **Role & Trade-Off:** Illuminates true 3D surface shading, decodes multiplier gate math (`[ARRAY GAIN +25%]`), and classifies ore grades, but has short range and degrades into `[GATE: ???]` static when `opticClarity < 0.48` until cleared via **Optic Purge**.

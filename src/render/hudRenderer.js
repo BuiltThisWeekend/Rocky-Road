@@ -25,7 +25,8 @@ export class HudRenderer {
       Math.round(runState.level.targetRunDistance - runState.distanceTraveled)
     );
 
-    this.elDepth.textContent = `-${currentDepth}m (${remainingDist}m left)`;
+    const condTag = runState.level.conditionLabel ? ` • ${runState.level.conditionLabel}` : '';
+    this.elDepth.textContent = `-${currentDepth}m (${remainingDist}m left)${condTag}`;
     this.elSpeed.textContent = `${Math.round(runState.speed * 3.6)} km/h`;
     this.elPayload.textContent = `${runState.payloadTons}t / ${runState.maxPayloadTons}t`;
 
@@ -56,9 +57,9 @@ export class HudRenderer {
     // Banner Alert
     if (runState.alertTimer > 0 && runState.alertBannerText) {
       this.elBanner.textContent = runState.alertBannerText;
-      this.elBanner.classList.remove('hidden');
+      this.elBanner.className = runState.alertTone === 'good' ? 'banner-good' : 'banner-danger';
     } else {
-      this.elBanner.classList.add('hidden');
+      this.elBanner.className = 'hidden';
     }
 
     // Mounted Hardpoints Health Readout

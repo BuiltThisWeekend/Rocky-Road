@@ -46,21 +46,20 @@ export const SENSORS_CONFIG = {
     name: '4D Doppler Radar',
     shortLabel: '4D-RADAR',
     type: 'radar',
-    description: 'Pierces 100% dust & tracks speed, but locations jitter.',
-    visualRoleBadge: '100% DUST PROOF | JITTERY POS',
+    description: '100% dust & fog penetration (6–120m). Tracks moving vehicle speed.',
+    visualRoleBadge: '6–120m ALL-WEATHER | DOPPLER',
     minRange: 6,
     baseRange: 120,
     fovAngle: 68,
     dustPenetration: 1.0,
-    basePositionJitter: 0.45,
+    basePositionJitter: 0,
     powerDrawKw: 32,
     weightKg: 125,
     renderColor: '#ffaa00',
     baseUpgradeCost: 550,
     costMultiplier: 1.65,
     perLevelBonus: {
-      range: 12,
-      jitterReduction: 0.06
+      range: 12
     }
   },
   optical_cam: {
@@ -97,9 +96,7 @@ export function getSensorStatsAtLevel(sensorId, level = 1) {
     effectiveRange: cfg.baseRange + (cfg.perLevelBonus.range || 0) * lvlIndex,
     pointDensityMultiplier: 1 + (cfg.perLevelBonus.pointDensity || 0) * lvlIndex,
     mudResistance: Math.min(0.85, (cfg.perLevelBonus.mudResistance || 0) * lvlIndex),
-    positionJitter: cfg.basePositionJitter
-      ? Math.max(0.15, cfg.basePositionJitter - (cfg.perLevelBonus.jitterReduction || 0) * lvlIndex)
-      : 0,
+    positionJitter: 0,
     nextUpgradeCost: Math.round(cfg.baseUpgradeCost * Math.pow(cfg.costMultiplier, lvlIndex))
   };
 }
